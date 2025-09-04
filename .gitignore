@@ -1,0 +1,16 @@
+# Ignore build outputs
+bin/
+obj/
+*.user
+*.rsuser
+*.suo
+*.cache
+*.pdb
+*.userprefs
+
+# Ignore IDE directories
+.vs/
+.idea/
+
+# Ignore local configuration
+appsettings.Development.json
