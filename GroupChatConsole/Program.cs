@@ -1,6 +1,6 @@
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.ChatCompletion;
+using Microsoft.SemanticKernel.Agents.Orchestration;
 
 namespace GroupChatConsole;
 
