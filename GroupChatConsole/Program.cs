@@ -1,55 +1,77 @@
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Agents.ChatCompletion;
-using Microsoft.SemanticKernel.Agents.Orchestration;
+using Microsoft.SemanticKernel.Agents;
+using Microsoft.SemanticKernel.ChatCompletion;
+using GroupChatConsole.Services;
 
 namespace GroupChatConsole;
 
+/// <summary>
+/// Interactive AI Chat with Multi-Cultural Perspectives
+/// Demonstrates how to use AI agents representing different cultural backgrounds
+/// to engage in thoughtful discussions and debates.
+/// </summary>
 internal class Program
 {
     private static async Task Main(string[] args)
     {
-        // Build kernel with OpenAI chat completion
-        var builder = Kernel.CreateBuilder();
-        builder.AddOpenAIChatCompletion(
-            modelId: Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-3.5-turbo",
-            apiKey: Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "" );
-        var kernel = builder.Build();
+        Console.WriteLine("=== Software Development Team Discussion ===");
+        Console.WriteLine("Chat with AI agents representing different roles in a software development team!");
+        Console.WriteLine("Type 'help' for commands or start chatting.\n");
 
-        // Define agents with different expertise
-        var chef = new ChatCompletionAgent(kernel)
+        // Initialize the kernel with AI service
+        var kernel = await KernelService.InitializeKernelAsync();
+        if (kernel == null)
         {
-            Name = "Chef",
-            Instructions = "You are a helpful chef who offers cooking tips and recipes."
-        };
+            Console.WriteLine("Press Enter to exit...");
+            try { Console.ReadLine(); } catch { }
+            return;
+        }
 
-        var poet = new ChatCompletionAgent(kernel)
-        {
-            Name = "Poet",
-            Instructions = "You are a creative poet who responds only in rhymes."
-        };
+        // Create agents and orchestration service
+        var agents = Services.AgentFactory.CreateAgents(kernel);
+        var coordinator = Services.AgentFactory.CreateCoordinator(kernel);
+        var orchestrationService = new OrchestrationService(kernel, agents, coordinator);
+        var chatHistory = new ChatHistory();
 
-        var manager = new ChatCompletionAgent(kernel)
-        {
-            Name = "Manager",
-            Instructions = "You are an orchestration agent. Decide which specialist should answer the user's questions."
-        };
+        await RunInteractiveChatAsync(orchestrationService, chatHistory);
+    }
 
-        var groupChat = new GroupChat(kernel, manager, new[] { chef, poet });
+    /// <summary>
+    /// Main interactive chat loop
+    /// </summary>
+    private static async Task RunInteractiveChatAsync(OrchestrationService orchestrationService, ChatHistory chatHistory)
+    {
+        Console.WriteLine("Ready! Start by asking a question or type 'help' for commands.\n");
 
-        Console.WriteLine("Enter your message (type 'exit' to quit):");
         while (true)
         {
-            Console.Write("User: ");
-            var input = Console.ReadLine();
-            if (string.Equals(input, "exit", StringComparison.OrdinalIgnoreCase))
-            {
-                break;
-            }
+            Console.Write("You: ");
+            string? userInput = await GetUserInputAsync();
 
-            await foreach (var message in groupChat.InvokeAsync(input!))
-            {
-                Console.WriteLine($"{message.AuthorName}: {message.Content}");
-            }
+            if (userInput == null) break; // Console not available
+            if (string.IsNullOrWhiteSpace(userInput)) continue;
+
+            // Handle special commands
+            if (await CommandHandler.HandleCommandAsync(userInput, chatHistory, orchestrationService)) continue;
+
+            // Process user message using the current orchestration strategy
+            await orchestrationService.ProcessUserMessageAsync(userInput, chatHistory);
+        }
+    }
+
+    /// <summary>
+    /// Get user input with error handling
+    /// </summary>
+    private static Task<string?> GetUserInputAsync()
+    {
+        try
+        {
+            return Task.FromResult(Console.ReadLine());
+        }
+        catch (InvalidOperationException)
+        {
+            Console.WriteLine("Console input not available. Exiting...");
+            return Task.FromResult<string?>(null);
         }
     }
 }
